@@ -5,14 +5,19 @@
   "installCommand": "echo skip-root-install",
   "functions": {
     "api/index.py": {
-      "runtime": "python3.12",
       "memory": 1024,
       "maxDuration": 30,
       "includeFiles": "backend/**"
     }
   },
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/index" },
-    { "source": "/((?!api/|assets/).*)", "destination": "/index.html" }
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/((?!api/|assets/).*)",
+      "destination": "/index.html"
+    }
   ]
 }
