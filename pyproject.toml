@@ -1,3 +1,19 @@
+[project]
+name = "wind-day-ahead-desk"
+version = "1.0.0"
+description = "Day-ahead wind forecast decision support for a GB procurement desk"
+requires-python = ">=3.12"
+# Keep in sync with requirements.txt (used by the Docker image). Vercel installs from here.
+dependencies = [
+  "fastapi==0.115.6",
+  "uvicorn[standard]==0.34.0",
+  "pandas==2.2.3",
+  "numpy==2.2.1",
+  "pydantic==2.10.4",
+  "pydantic-settings==2.7.1",
+  "httpx==0.28.1",
+]
+
 [tool.pytest.ini_options]
 testpaths = ["backend/tests"]
 pythonpath = ["."]

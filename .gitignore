@@ -14,3 +14,5 @@ web/dist/
 # challenge brief (not part of the product)
 *.docx
 .claude/
+.vercel
+.env*

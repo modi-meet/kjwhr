@@ -1,23 +1,11 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": null,
   "buildCommand": "cd web && npm ci && npm run build",
-  "outputDirectory": "web/dist",
-  "installCommand": "echo skip-root-install",
   "functions": {
     "api/index.py": {
-      "memory": 1024,
       "maxDuration": 30,
-      "includeFiles": "backend/**"
+      "includeFiles": "{backend,web/dist}/**"
     }
-  },
-  "rewrites": [
-    {
-      "source": "/api/(.*)",
-      "destination": "/api/index"
-    },
-    {
-      "source": "/((?!api/|assets/).*)",
-      "destination": "/index.html"
-    }
-  ]
+  }
 }
