@@ -323,3 +323,6 @@ details.panel > summary .chev { color: var(--muted); transition: transform var(-
 details.panel[open] > summary .chev { transform: rotate(90deg); }
 details.panel[open] > summary { margin-bottom: 0.625rem; }
 details.panel > summary .muted { margin-top: 0.1rem; }
+
+.foot .live::before, .foot .fallback::before { content: ''; display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px; background: var(--good); vertical-align: 1px; }
+.foot .fallback::before { background: var(--warn); }

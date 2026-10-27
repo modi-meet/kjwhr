@@ -34,7 +34,11 @@ export default function App() {
         {meta.data ? (
           <>
             <span>{meta.data.assumptions.decision_window}</span>
-            <span>Snapshot fetched {meta.data.snapshot.fetched_at?.slice(0, 10)} from Elexon Insights.</span>
+            <span className={meta.data.source.source === 'live' ? 'live' : 'fallback'}>
+              {meta.data.source.source === 'live'
+                ? `Live from the Elexon API, fetched ${meta.data.source.fetched_at?.slice(11, 16)} UTC.`
+                : 'Elexon API unreachable: showing the saved January snapshot.'}
+            </span>
           </>
         ) : null}
       </footer>

@@ -43,7 +43,7 @@ export type Meta = {
   cutoff_presets: string[]
   default_decision_day: string
   vintage_times: string[]
-  snapshot: { fetched_at?: string; sources?: Record<string, string>; [k: string]: unknown }
+  source: { source?: 'live' | 'snapshot'; fetched_at?: string; fallback_reason?: string; sources?: Record<string, string>; [k: string]: unknown }
   assumptions: Record<'decision_window' | 'cutoff_rule' | 'aggregation' | 'error_sign' | 'band', string>
 }
 export type Decision = {
