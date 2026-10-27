@@ -13,16 +13,21 @@ Conventions (see README "Assumptions"):
 from __future__ import annotations
 
 import json
+import logging
+import threading
+import time as _time
 from dataclasses import dataclass
-from datetime import date, datetime, time, timedelta
-from functools import lru_cache
+from datetime import UTC, date, datetime, time, timedelta
 from pathlib import Path
 
 import pandas as pd
 
+from . import elexon
 from .settings import settings
 
-UTC = "UTC"
+log = logging.getLogger(__name__)
+
+TZ = "UTC"
 
 
 # --------------------------------------------------------------------------- loading
@@ -85,7 +90,7 @@ def select_vintage(
     forecasts: pd.DataFrame, decision_day: date, cutoff: time
 ) -> pd.Timestamp | None:
     """Latest publishTime strictly before `cutoff` on `decision_day`, or None."""
-    gate = pd.Timestamp(datetime.combine(decision_day, cutoff), tz=UTC)
+    gate = pd.Timestamp(datetime.combine(decision_day, cutoff), tz=TZ)
     pubs = forecasts.loc[forecasts["publish"] < gate, "publish"]
     return None if pubs.empty else pubs.max()
 
@@ -206,6 +211,48 @@ def build_vintage_table(
     ]
 
 
+# --------------------------------------------------------------------------- live loading
+
+
+def live_windows() -> tuple[tuple[date, date], tuple[datetime, datetime]]:
+    """Elexon request windows for the configured decision-day range.
+
+    Actuals: first decision day .. last delivery day.  Forecasts: published from the day before the
+    first decision day up to the end of the last decision day.
+    """
+    a, b = settings.decision_from, settings.decision_to
+    fuelhh = (a, b + timedelta(days=1))
+    windfor = (
+        datetime.combine(a - timedelta(days=1), datetime.min.time(), UTC),
+        datetime.combine(b + timedelta(days=1), datetime.min.time(), UTC),
+    )
+    return fuelhh, windfor
+
+
+def load_live() -> tuple[pd.DataFrame, pd.DataFrame, dict]:
+    """Fetch FUELHH (WIND) and WINDFOR from the Elexon API."""
+    (f_from, f_to), (w_from, w_to) = live_windows()
+    fuelhh = elexon.fetch_fuelhh(f_from, f_to)
+    windfor = elexon.fetch_windfor(w_from, w_to)
+    if not fuelhh or not windfor:
+        raise RuntimeError("Elexon returned no rows")
+    actuals, forecasts = (
+        normalise_actuals(pd.DataFrame(fuelhh)),
+        normalise_forecasts(pd.DataFrame(windfor)),
+    )
+    meta = {
+        "source": "live",
+        "fetched_at": datetime.now(UTC).isoformat(timespec="seconds"),
+        "sources": {
+            "FUELHH": elexon.fuelhh_url(f_from, f_to),
+            "WINDFOR": elexon.windfor_url(w_from, w_to),
+        },
+        "fuelhh": {"rows": len(actuals)},
+        "windfor": {"rows": len(forecasts), "publications": int(forecasts["publish"].nunique())},
+    }
+    return actuals, forecasts, meta
+
+
 # --------------------------------------------------------------------------- cached dataset
 
 
@@ -225,7 +272,49 @@ class Dataset:
         return build_vintage_table(self.forecasts, self.actuals_h, start, end)
 
 
-@lru_cache(maxsize=1)
-def get_dataset() -> Dataset:
+_lock = threading.Lock()
+_cache: tuple[float, Dataset] | None = None
+
+
+def _build() -> Dataset:
+    if settings.data_source == "live":
+        try:
+            actuals_hh, forecasts, meta = load_live()
+            return Dataset(actuals_hh, hourly_actuals(actuals_hh), forecasts, meta)
+        except Exception as exc:  # network, HTTP error, or empty payload
+            log.warning("Elexon live fetch failed (%s); falling back to committed snapshot", exc)
+            actuals_hh, forecasts, meta = load_snapshot()
+            meta = {**meta, "source": "snapshot", "fallback_reason": f"Elexon unreachable: {exc}"}
+            return Dataset(actuals_hh, hourly_actuals(actuals_hh), forecasts, meta)
     actuals_hh, forecasts, meta = load_snapshot()
-    return Dataset(actuals_hh, hourly_actuals(actuals_hh), forecasts, meta)
+    return Dataset(
+        actuals_hh, hourly_actuals(actuals_hh), forecasts, {**meta, "source": "snapshot"}
+    )
+
+
+def get_dataset() -> Dataset:
+    """Process-wide dataset.  Live data is refreshed after `live_cache_seconds`; a failed refresh
+    keeps serving the previous copy rather than breaking the app."""
+    global _cache
+    now = _time.monotonic()
+    with _lock:
+        if _cache is not None and now - _cache[0] < settings.live_cache_seconds:
+            return _cache[1]
+        fresh = _build()
+        if (
+            _cache is not None
+            and fresh.meta.get("source") == "snapshot"
+            and settings.data_source == "live"
+        ):
+            if _cache[1].meta.get("source") == "live":
+                _cache = (now, _cache[1])  # keep the last good live copy, retry next window
+                return _cache[1]
+        _cache = (now, fresh)
+        return fresh
+
+
+def reset_cache() -> None:
+    """Drop the cached dataset (tests)."""
+    global _cache
+    with _lock:
+        _cache = None

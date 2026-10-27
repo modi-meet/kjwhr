@@ -24,6 +24,11 @@ class Settings(BaseSettings):
     decision_from: date = date(2026, 1, 1)
     decision_to: date = date(2026, 1, 31)
 
+    # "live": call the Elexon API (cached in memory), falling back to the committed snapshot if it
+    # is unreachable.  "snapshot": never call Elexon (used by tests and offline demos).
+    data_source: str = "live"
+    live_cache_seconds: int = 3600
+
     snapshot_dir: Path = Path("backend/app/snapshot")
 
     @property

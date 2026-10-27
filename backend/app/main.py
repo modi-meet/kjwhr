@@ -1,4 +1,4 @@
-"""FastAPI application: three read-only endpoints over the committed Elexon snapshot."""
+"""FastAPI application: three read-only endpoints over live Elexon FUELHH and WINDFOR data."""
 
 from __future__ import annotations
 
@@ -96,7 +96,7 @@ def meta() -> dict:
         "cutoff_presets": list(settings.cutoff_presets),
         "default_decision_day": _default_decision_day(ds).isoformat(),
         "vintage_times": vt,
-        "snapshot": ds.meta,
+        "source": ds.meta,
         "assumptions": ASSUMPTIONS,
     }
 

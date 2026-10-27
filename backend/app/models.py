@@ -22,7 +22,7 @@ class Meta(BaseModel):
     cutoff_presets: list[str]
     default_decision_day: str
     vintage_times: list[str]
-    snapshot: dict
+    source: dict
     assumptions: Assumptions
 
 

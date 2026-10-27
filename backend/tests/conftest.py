@@ -1,7 +1,11 @@
+import os
 from datetime import UTC, datetime, timedelta
 
 import pandas as pd
 import pytest
+
+# Tests are deterministic and offline unless a test explicitly exercises the live path.
+os.environ.setdefault("DATA_SOURCE", "snapshot")
 
 
 def ts(s: str) -> pd.Timestamp:
