@@ -6,7 +6,7 @@ day-ahead gate closure, and how wrong does that forecast tend to be?**
 Data: Elexon Insights `FUELHH` (actual generation, fuelType `WIND`) and `WINDFOR` (national wind forecast).
 Scope: purchase decisions made in January 2026. React front-end, Python (FastAPI) back-end, Docker, Vercel.
 
-**Live app:** _TODO: paste the Vercel URL here_ · **API docs:** `<live-url>/api/docs`
+**Live app:** https://kjwhr-sepia.vercel.app · **API docs:** https://kjwhr-sepia.vercel.app/api/docs
 
 ---
 
@@ -40,8 +40,8 @@ systematically above metered transmission-connected wind, so a margin is needed 
 ├── PLAN.md                     # build plan incl. review revisions (design rationale)
 ├── requirements.txt            # runtime Python deps (root so the Vercel function finds it)
 ├── requirements-dev.txt        # + pytest, ruff
-├── pyproject.toml              # pytest / ruff config
-├── vercel.json                 # build web/, route /api/* -> Python function, SPA fallback
+├── pyproject.toml              # dependencies (Vercel installs from here), pytest / ruff config
+├── vercel.json                 # build web/, bundle it into the Python function
 ├── Dockerfile                  # single multi-stage image: Node builds web/, Python serves it + /api
 ├── docker-compose.yml          # optional dev convenience (hot-reload API + Vite dev server)
 ├── .github/workflows/ci.yml    # ruff + pytest, tsc + vite build, docker build + smoke test
@@ -109,11 +109,19 @@ Pulls both datasets for the configured window from Elexon, dedupes, writes
 
 ### Deploying to Vercel
 
-The repo is a single Vercel project: `vercel.json` builds `web/` as the static site and routes `/api/*`
-to the Python function in `api/index.py` (which imports `backend/`). Import the repo in Vercel (or
-`npx vercel --prod`), no environment variables required. Turn **off** Deployment Protection so the link
-works in incognito. Vercel does not run the Docker image; the image is the local/reviewer artifact and
-would deploy unchanged to Heroku (`heroku container:push web`) if needed.
+One Vercel project. Vercel detects the FastAPI app (`api/index.py`, which imports `backend/`) and installs
+its dependencies from `pyproject.toml` (keep it in sync with `requirements.txt`, which the Docker image uses).
+`vercel.json` builds the React app (`web/dist`) and bundles it into the function, so the same app serves the
+UI and `/api/*`. No environment variables are needed.
+
+```bash
+npx vercel login
+npx vercel deploy --prod
+```
+
+Turn **off** Deployment Protection in the project settings so the link opens in incognito. Vercel does not run
+the Docker image; the image is the local/reviewer artifact and would deploy unchanged to Heroku
+(`heroku container:push web`) if needed.
 
 ## Assumptions (the ones a reviewer will ask about)
 
