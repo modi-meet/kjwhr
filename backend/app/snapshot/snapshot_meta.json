@@ -1,0 +1,20 @@
+{
+  "fetched_at": "2026-10-27T12:19:39+00:00",
+  "sources": {
+    "FUELHH": "https://data.elexon.co.uk/bmrs/api/v1/datasets/FUELHH/stream?settlementDateFrom=2026-01-01&settlementDateTo=2026-02-01&fuelType=WIND",
+    "WINDFOR": "https://data.elexon.co.uk/bmrs/api/v1/datasets/WINDFOR/stream?publishDateTimeFrom=2025-12-31T00:00Z&publishDateTimeTo=2026-02-01T00:00Z"
+  },
+  "fuelhh": {
+    "rows_raw": 1536,
+    "rows": 1536,
+    "start_min": "2026-01-01T00:00:00Z",
+    "start_max": "2026-02-01T23:30:00Z"
+  },
+  "windfor": {
+    "rows_raw": 18688,
+    "rows": 18688,
+    "publications": 256,
+    "publish_min": "2025-12-31T02:30:00Z",
+    "publish_max": "2026-01-31T22:30:00Z"
+  }
+}
