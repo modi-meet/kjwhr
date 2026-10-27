@@ -1,0 +1,16 @@
+# python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+# node
+node_modules/
+web/dist/
+# env / editor / os
+.env
+.DS_Store
+.vercel/
+# challenge brief (not part of the product)
+*.docx
+.claude/
