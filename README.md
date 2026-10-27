@@ -51,12 +51,12 @@ systematically above metered transmission-connected wind, so a margin is needed 
 │   ├── app/
 │   │   ├── main.py             # FastAPI routes: /api/meta, /api/decision/{day}, /api/accuracy
 │   │   ├── models.py           # Pydantic response models (drive /api/docs)
-│   │   ├── settings.py         # cutoff, decision window, snapshot path (env-overridable)
+│   │   ├── settings.py         # cutoff, decision window, data source + cache (env-overridable)
 │   │   ├── elexon.py           # client for the FUELHH / WINDFOR stream endpoints
-│   │   ├── data.py             # snapshot load, dedupe, hourly alignment, vintage selection, hindcast filter
+│   │   ├── data.py             # live Elexon load + cache + fallback, dedupe, hourly alignment, vintage selection, hindcast filter
 │   │   ├── metrics.py          # signed/abs errors, percentiles, coverage, breakdowns, margin table
-│   │   └── snapshot/           # committed January 2026 data + snapshot_meta.json
-│   ├── scripts/fetch_snapshot.py   # (re)build the snapshot from Elexon  (--refresh)
+│   │   └── snapshot/           # committed January 2026 fallback copy + snapshot_meta.json
+│   ├── scripts/fetch_snapshot.py   # (re)build the fallback snapshot from Elexon  (--refresh)
 │   └── tests/                  # pytest: alignment, cutoff rule, hindcast, metrics, API, snapshot invariants
 └── web/                        # Vite + React 19 + TypeScript
     └── src/
@@ -98,14 +98,19 @@ Or `docker compose up` for the same two processes in containers.
 cd web && npx tsc --noEmit && npm run build
 ```
 
-### Refreshing the data
+### Data source: live API, snapshot as fallback
+
+The backend calls the Elexon Insights API (`FUELHH` and `WINDFOR`) on the first request, keeps the result in
+memory for an hour (`LIVE_CACHE_SECONDS`), and refreshes it afterwards. The cold first request takes about
+2.5 s; later ones are served from memory. If Elexon is unreachable, it serves the committed snapshot instead and
+the UI footer says so. `DATA_SOURCE=snapshot` forces offline mode (the tests use it).
 
 ```bash
 .venv/bin/python backend/scripts/fetch_snapshot.py --refresh
 ```
 
-Pulls both datasets for the configured window from Elexon, dedupes, writes
-`backend/app/snapshot/*.json` and `snapshot_meta.json` (fetch time, URLs, row counts).
+Re-pulls both datasets for the configured window from Elexon, dedupes, and rewrites
+`backend/app/snapshot/*.json` and `snapshot_meta.json`. The snapshot is only the fallback copy (see above).
 
 ### Deploying to Vercel
 
@@ -147,16 +152,16 @@ the Docker image; the image is the local/reviewer artifact and would deploy unch
    mean actual instead (no installed-capacity data in scope).
 9. **What the series are.** Both `FUELHH` WIND and `WINDFOR` describe transmission-connected (BM-unit)
    wind; embedded wind is excluded from both, so they are comparable.
-10. **Snapshot, not live.** Data was fetched on the date in `snapshot_meta.json` and committed (JSON, ~2 MB).
-    The month is historical, so this removes Elexon availability from the demo and makes tests
-    deterministic. The live client path is exercised by `fetch_snapshot.py --refresh`.
+10. **Live API, with a saved fallback.** Data is fetched from the Elexon API at runtime and cached in
+    memory. A January 2026 snapshot (about 2 MB of JSON) is committed only as a fallback so the demo still
+    works if Elexon is down, and so the tests are deterministic and offline.
 11. **One-off publications are hidden from the vintage comparison.** A single ad-hoc 12:25 run exists in
     January; it is not a schedule the desk can plan around, so runs seen on fewer than half the days are
     dropped from the "does waiting help?" chart.
 
 ## Design notes for the reviewer
 
-- **Data flow:** Elexon -> `fetch_snapshot.py` -> JSON snapshot -> `data.py` (normalise, dedupe, hourly
+- **Data flow:** Elexon API (snapshot fallback) -> `data.py` (normalise, dedupe, hourly
   mean, vintage selection) -> `metrics.py` (pure functions over a long "decision table") -> `main.py`
   (Pydantic-typed JSON) -> React (TanStack Query + Recharts).
 - **Everything is a function of (window, cutoff).** Both endpoints take `cutoff=HH:MM`, so the desk can
@@ -191,4 +196,4 @@ independent review of it, scaffolding, writing the data/metrics/API modules and 
 Docker/Vercel/CI configuration and this README. All domain assumptions (auction timing, hourly alignment,
 sign convention, interpretation of the January window) were verified by me against the live Elexon API
 and the challenge brief, and every generated module is covered by the test suite in `backend/tests`
-(27 tests) plus a manual browser check of both screens against the real January data.
+(31 tests) plus a manual browser check of both screens against the real January data.
